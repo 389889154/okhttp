@@ -29,6 +29,7 @@ import javax.net.ssl.SSLSocketFactory;
 import okhttp3.Address;
 import okhttp3.CertificatePinner;
 import okhttp3.Connection;
+import okhttp3.EventListener;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
@@ -65,6 +66,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
   private final OkHttpClient client;
   private final boolean forWebSocket;
   private StreamAllocation streamAllocation;
+  private EventListener eventListener;
   private Object callStackTrace;
   private volatile boolean canceled;
 
@@ -92,6 +94,10 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
     return canceled;
   }
 
+  public void setEventListener(EventListener eventListener) {
+    this.eventListener = eventListener;
+  }
+
   public void setCallStackTrace(Object callStackTrace) {
     this.callStackTrace = callStackTrace;
   }
@@ -104,7 +110,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
     Request request = chain.request();
 
     streamAllocation = new StreamAllocation(
-        client.connectionPool(), createAddress(request.url()), callStackTrace);
+        client.connectionPool(), createAddress(request.url()), eventListener, callStackTrace);
 
     int followUpCount = 0;
     Response priorResponse = null;
@@ -173,7 +179,7 @@ public final class RetryAndFollowUpInterceptor implements Interceptor {
       if (!sameConnection(response, followUp.url())) {
         streamAllocation.release();
         streamAllocation = new StreamAllocation(
-            client.connectionPool(), createAddress(followUp.url()), callStackTrace);
+            client.connectionPool(), createAddress(followUp.url()), eventListener, callStackTrace);
       } else if (streamAllocation.codec() != null) {
         throw new IllegalStateException("Closing the body of " + response
             + " didn't close its backing stream. Bad interceptor?");

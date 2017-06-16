@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 import okhttp3.Address;
+import okhttp3.EventListener;
 import okhttp3.HttpUrl;
 import okhttp3.Route;
 import okhttp3.internal.Util;
@@ -38,6 +39,7 @@ import okhttp3.internal.Util;
 public final class RouteSelector {
   private final Address address;
   private final RouteDatabase routeDatabase;
+  private final EventListener eventListener;
 
   /* The most recently attempted route. */
   private Proxy lastProxy;
@@ -54,9 +56,10 @@ public final class RouteSelector {
   /* State for negotiating failed routes */
   private final List<Route> postponedRoutes = new ArrayList<>();
 
-  public RouteSelector(Address address, RouteDatabase routeDatabase) {
+  public RouteSelector(Address address, RouteDatabase routeDatabase, EventListener eventListener) {
     this.address = address;
     this.routeDatabase = routeDatabase;
+    this.eventListener = eventListener;
 
     resetNextProxy(address.url(), address.proxy());
   }
@@ -168,6 +171,7 @@ public final class RouteSelector {
       inetSocketAddresses.add(InetSocketAddress.createUnresolved(socketHost, socketPort));
     } else {
       // Try each address for best behavior in mixed IPv4/IPv6 environments.
+      eventListener.dnsStart(null, socketHost);
       List<InetAddress> addresses = address.dns().lookup(socketHost);
       if (addresses.isEmpty()) {
         throw new UnknownHostException(address.dns() + " returned no addresses for " + socketHost);
@@ -177,6 +181,8 @@ public final class RouteSelector {
         InetAddress inetAddress = addresses.get(i);
         inetSocketAddresses.add(new InetSocketAddress(inetAddress, socketPort));
       }
+
+      eventListener.dnsEnd(null, socketHost, addresses, null);
     }
 
     nextInetSocketAddressIndex = 0;
